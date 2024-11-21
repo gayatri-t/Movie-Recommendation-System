@@ -1,46 +1,34 @@
 import pandas as pd
 import re
-import gdown
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 import streamlit as st
 import requests
 
-# Google Drive file IDs
-movies_url = "https://drive.google.com/file/d/1qczpeJ8bb-13n77Vu7J_P5JqRRBf30lw"
-ratings_url = "https://drive.google.com/file/d/1Tiq_6VIuiXTfhFg5WghHhWs1jBMQQRIl"
-
-# Download files using gdown
-def download_data():
-    gdown.download(movies_url, 'movies_metadata.csv', quiet=False)
-    gdown.download(ratings_url, 'ratings.csv', quiet=False)
-
 # Load datasets
-download_data()
 movies = pd.read_csv('movies_metadata.csv', low_memory=False)
 ratings = pd.read_csv('ratings.csv')
 
-# Process the datasets as per your original code
+# Convert 'id' column in movies and 'movieId' column in ratings to the same type
 movies['id'] = pd.to_numeric(movies['id'], errors='coerce')
-movies = movies.dropna(subset=['id'])
-movies['id'] = movies['id'].astype(int)
+movies = movies.dropna(subset=['id'])  # Drop rows where 'id' is NaN
+movies['id'] = movies['id'].astype(int)  # Convert to integer after dropping NaN
 ratings['movieId'] = ratings['movieId'].astype(int)
 
 # Merge datasets based on movieId
-merged_data = pd.merge(ratings, movies[['id', 'original_title', 'overview', 'genres', 'imdb_id']], 
+merged_data = pd.merge(ratings, movies[['id', 'original_title', 'overview', 'imdb_id']], 
                        left_on='movieId', right_on='id', how='inner')
 
 # Filter relevant columns
-merged_data = merged_data[['userId', 'original_title', 'overview', 'rating', 'genres', 'imdb_id']]
+merged_data = merged_data[['userId', 'original_title', 'overview', 'rating', 'imdb_id']]
 
 # Handle NaN values in the 'overview' column by replacing NaN with an empty string
 merged_data['overview'] = merged_data['overview'].fillna('')
 
 # Function to check if a string contains only English characters (no non-English characters)
 def is_english_title(title):
-    return bool(re.match('^[A-Za-z0-9\s:;,.!?()\-]+$', title))
-
+    return bool(re.match('^[A-Za-z0-9\\s:;,.!?()\\-]+$', title))
 # Function to fetch movie posters from OMDb API
 def fetch_poster(imdb_id, api_key="61d9a9ee"):
     if pd.isna(imdb_id) or not imdb_id:
@@ -58,20 +46,12 @@ def recommend_movies(user_id, search_query, merged_data):
     # Filter movies rated by the user
     user_ratings = merged_data[merged_data['userId'] == user_id]
     
-    # Filter movies based on the search query (using 'original_title', 'overview', or 'genres')
-    filtered_movies = merged_data[
-        merged_data['original_title'].str.contains(search_query, case=False, na=False) |
-        merged_data['overview'].str.contains(search_query, case=False, na=False) |
-        merged_data['genres'].str.contains(search_query, case=False, na=False)
-    ]
+    # Filter movies based on the search query (using 'original_title' or 'overview')
+    filtered_movies = merged_data[merged_data['original_title'].str.contains(search_query, case=False, na=False) | 
+                                  merged_data['overview'].str.contains(search_query, case=False, na=False)]
     
     # Remove duplicate movies from the filtered result
     filtered_movies = filtered_movies.drop_duplicates(subset=['original_title'])
-
-    # Fallback: If fewer than 10 recommendations, add top-rated movies
-    if len(filtered_movies) < 10:
-        top_rated_movies = merged_data.sort_values(by='rating', ascending=False).head(10 - len(filtered_movies))
-        filtered_movies = pd.concat([filtered_movies, top_rated_movies])
 
     # TF-IDF Vectorizer for feature extraction
     tfidf = TfidfVectorizer(stop_words='english', max_features=100000, ngram_range=(1, 5))
