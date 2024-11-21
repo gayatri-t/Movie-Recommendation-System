@@ -46,37 +46,38 @@ def recommend_movies(user_id, search_query, merged_data):
     # Filter movies rated by the user
     user_ratings = merged_data[merged_data['userId'] == user_id]
     
+    if user_ratings.empty:
+        return pd.DataFrame()  # Return an empty dataframe if no ratings are found
+    
     # Filter movies based on the search query (using 'original_title' or 'overview')
     filtered_movies = merged_data[merged_data['original_title'].str.contains(search_query, case=False, na=False) | 
                                   merged_data['overview'].str.contains(search_query, case=False, na=False)]
     
-    # Remove duplicate movies from the filtered result
-    filtered_movies = filtered_movies.drop_duplicates(subset=['original_title'])
+    if filtered_movies.empty:
+        # If no movies match the search query, recommend the top-rated movies from user's history
+        top_rated_movies = user_ratings.sort_values(by='rating', ascending=False)
+        top_rated_movies = top_rated_movies[['original_title', 'overview', 'rating', 'imdb_id']].head(10)
+        return top_rated_movies
 
-    # TF-IDF Vectorizer for feature extraction
-    tfidf = TfidfVectorizer(stop_words='english', max_features=100000, ngram_range=(1, 5))
-    
     # Combine user-rated movies and filtered search query movies for similarity calculation
     all_movies = pd.concat([user_ratings[['original_title', 'overview']], filtered_movies[['original_title', 'overview']]])
+    tfidf = TfidfVectorizer(stop_words='english', max_features=100000, ngram_range=(1, 5))
     tfidf_matrix = tfidf.fit_transform(all_movies['overview'])
 
     # Compute cosine similarity for the user-rated movies with filtered movies
     user_movie_indices = range(len(user_ratings))  # Indices of user-rated movies in the combined list
     cosine_similarities = cosine_similarity(tfidf_matrix[user_movie_indices], tfidf_matrix[len(user_ratings):])
 
+    if cosine_similarities.shape[0] == 0:  # If there are no valid similarity scores
+        return pd.DataFrame()  # Return an empty dataframe
+
     # Calculate the average similarity score for each of the filtered movies
     avg_similarities = cosine_similarities.mean(axis=0)
-
-    # Add the similarity score as a new column (use .loc to avoid SettingWithCopyWarning)
     filtered_movies.loc[:, 'similarity_score'] = avg_similarities
 
     # Sort movies based on similarity score and recommend the top 10
     top_recommendations = filtered_movies[['original_title', 'overview', 'similarity_score', 'imdb_id']].sort_values(by='similarity_score', ascending=False)
 
-    # Filter the top recommendations to include only English movie titles
-    top_recommendations = top_recommendations[top_recommendations['original_title'].apply(is_english_title)]
-
-    # Return the top 10 movies (if there are fewer than 10, return as many as available)
     return top_recommendations.head(10)
 
 # Streamlit user interface
