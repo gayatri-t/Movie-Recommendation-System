@@ -8,8 +8,8 @@ import streamlit as st
 import requests
 
 # Google Drive file IDs
-movies_url = "https://drive.google.com/uc?id=1us2riF134ntAdEbBbg50npbue1_u185B"
-ratings_url = "https://drive.google.com/uc?id=1XUSJTFkdBUgFGhbJBb7cdtLnLjm6ldtc"
+movies_url = "https://drive.google.com/file/d/1qczpeJ8bb-13n77Vu7J_P5JqRRBf30lw"
+ratings_url = "https://drive.google.com/file/d/1Tiq_6VIuiXTfhFg5WghHhWs1jBMQQRIl"
 
 # Download files using gdown
 def download_data():
