@@ -80,7 +80,23 @@ def recommend_movies(user_id, search_query, merged_data):
     return top_recommendations[['original_title', 'overview', 'similarity_score', 'imdb_id']].drop_duplicates(subset='original_title').head(10)
 
 # Streamlit user interface
-st.title("Movie Recommendation System")
+st.markdown(
+    """
+    <style>
+    .title {
+        color: red;
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 48px;
+        text-align: center;
+    }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+    """,
+    unsafe_allow_html=True,
+)
+
+# Apply the custom style to the title
+st.markdown('<h1 class="title">Recommendations For You!</h1>', unsafe_allow_html=True)
 
 # Input fields for user ID and search query
 user_id = st.number_input("Enter User ID", min_value=1, max_value=1000)
