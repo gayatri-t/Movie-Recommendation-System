@@ -59,26 +59,36 @@ def recommend_movies(user_id, search_query, merged_data):
         top_rated_movies = top_rated_movies[['original_title', 'overview', 'rating', 'imdb_id']].head(10)
         return top_rated_movies
 
-    # Combine user-rated movies and filtered search query movies for similarity calculation
-    all_movies = pd.concat([user_ratings[['original_title', 'overview']], filtered_movies[['original_title', 'overview']]])
+    # Create a TF-IDF vectorizer
     tfidf = TfidfVectorizer(stop_words='english', max_features=100000, ngram_range=(1, 5))
-    tfidf_matrix = tfidf.fit_transform(all_movies['overview'])
+    
+    # Calculate similarity scores for filtered movies against all user-rated movies
+    similarity_scores = []
+    for _, movie in filtered_movies.iterrows():
+        # Combine user-rated movies and the current filtered movie's overview
+        all_movies = pd.concat([user_ratings[['original_title', 'overview']], 
+                                pd.DataFrame([[movie['original_title'], movie['overview']]], columns=['original_title', 'overview'])])
 
-    # Compute cosine similarity for the user-rated movies with filtered movies
-    user_movie_indices = range(len(user_ratings))  # Indices of user-rated movies in the combined list
-    cosine_similarities = cosine_similarity(tfidf_matrix[user_movie_indices], tfidf_matrix[len(user_ratings):])
+        # Fit TF-IDF on the combined data
+        tfidf_matrix = tfidf.fit_transform(all_movies['overview'])
+        
+        # Compute cosine similarity between the current filtered movie and user-rated movies
+        cosine_similarities = cosine_similarity(tfidf_matrix[-1:], tfidf_matrix[:-1])
 
-    if cosine_similarities.shape[0] == 0:  # If there are no valid similarity scores
-        return pd.DataFrame()  # Return an empty dataframe
+        # Average the similarity score between the current movie and all user-rated movies
+        avg_similarity = cosine_similarities.mean()
 
-    # Calculate the average similarity score for each of the filtered movies
-    avg_similarities = cosine_similarities.mean(axis=0)
-    filtered_movies.loc[:, 'similarity_score'] = avg_similarities
+        # Store the similarity score along with the movie details
+        similarity_scores.append((movie['original_title'], movie['overview'], avg_similarity, movie['imdb_id']))
+    
+    # Create a DataFrame of similarity scores
+    similarity_df = pd.DataFrame(similarity_scores, columns=['original_title', 'overview', 'similarity_score', 'imdb_id'])
 
-    # Sort movies based on similarity score and recommend the top 10
-    top_recommendations = filtered_movies[['original_title', 'overview', 'similarity_score', 'imdb_id']].sort_values(by='similarity_score', ascending=False)
+    # Sort the movies by similarity score and return top 10 recommendations
+    top_recommendations = similarity_df.sort_values(by='similarity_score', ascending=False).head(10)
+    
+    return top_recommendations
 
-    return top_recommendations.head(10)
 
 # Streamlit user interface
 st.title("Movie Recommendation System")
