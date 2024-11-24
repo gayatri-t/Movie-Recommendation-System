@@ -100,7 +100,7 @@ st.markdown('<h1 class="title">Recommendations For You!</h1>', unsafe_allow_html
 
 # Input fields for user ID and search query
 user_id = st.number_input("Enter User ID", min_value=1, max_value=1000)
-search_query = st.text_input("Enter Movie Search Query")
+search_query = st.text_input("What would you like to watch today?")
 
 # Button to generate recommendations
 if st.button('Get Recommendations'):
