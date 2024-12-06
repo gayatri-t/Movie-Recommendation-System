@@ -26,9 +26,6 @@ merged_data = merged_data[['userId', 'original_title', 'overview', 'rating', 'im
 # Handle NaN values in the 'overview' column by replacing NaN with an empty string
 merged_data['overview'] = merged_data['overview'].fillna('')
 
-# Function to check if a string contains only English characters (no non-English characters)
-def is_english_title(title):
-    return bool(re.match('^[A-Za-z0-9\\s:;,.!?()\\-]+$', title))
 # Function to fetch movie posters from OMDb API
 def fetch_poster(imdb_id, api_key="61d9a9ee"):
     if pd.isna(imdb_id) or not imdb_id:
@@ -41,6 +38,7 @@ def fetch_poster(imdb_id, api_key="61d9a9ee"):
             return data.get("Poster")  # Return the poster URL
     return None  # Return None if the API request fails or poster is not found
 
+# Recommendation function
 def recommend_movies(user_id, search_query, merged_data):
     # Filter movies rated by the user
     user_ratings = merged_data[merged_data['userId'] == user_id]
@@ -53,6 +51,10 @@ def recommend_movies(user_id, search_query, merged_data):
         merged_data['original_title'].str.contains(search_query, case=False, na=False) | 
         merged_data['overview'].str.contains(search_query, case=False, na=False)
     ].copy()  # Create a copy to avoid `SettingWithCopyWarning`
+
+    # Exclude movies with invalid IMDb IDs or poster URLs
+    filtered_movies['poster_url'] = filtered_movies['imdb_id'].apply(fetch_poster)
+    filtered_movies = filtered_movies[filtered_movies['poster_url'].notna()]
 
     if filtered_movies.empty:
         # If no movies match the search query, recommend the top-rated movies from user's history
@@ -77,7 +79,7 @@ def recommend_movies(user_id, search_query, merged_data):
 
     # Sort movies based on similarity score and recommend the top 10
     top_recommendations = filtered_movies.sort_values(by='similarity_score', ascending=False)
-    return top_recommendations[['original_title', 'overview', 'similarity_score', 'imdb_id']].drop_duplicates(subset='original_title').head(10)
+    return top_recommendations[['original_title', 'overview', 'similarity_score', 'poster_url']].drop_duplicates(subset='original_title').head(10)
 
 # Streamlit user interface
 st.markdown(
@@ -115,14 +117,11 @@ if st.button('Get Recommendations'):
     for _, row in recommended_movies.iterrows():
         col1, col2 = st.columns([1, 3])  # Create two columns for poster and movie details
         
-        # Fetch the poster for the movie using the IMDb ID
-        poster_url = fetch_poster(row['imdb_id'])
-        
         with col1:
-            if poster_url:
-                st.image(poster_url, width=120)  # Display the poster
+            if row['poster_url']:
+                st.image(row['poster_url'], width=120)  # Display the poster
             else:
-                st.text("No Image Available")
+                continue  # Skip movies without valid posters
         
         with col2:
             st.subheader(row['original_title'])
