@@ -30,7 +30,7 @@ merged_data['overview'] = merged_data['overview'].fillna('')
 def is_english_title(title):
     return bool(re.match('^[A-Za-z0-9\\s:;,.!?()\\-]+$', title))
 # Function to fetch movie posters from OMDb API
-def fetch_poster(imdb_id, api_key="d514e655"):
+def fetch_poster(imdb_id, api_key="61d9a9ee"):
     if pd.isna(imdb_id) or not imdb_id:
         return None  # Return None if IMDb ID is invalid
     url = f"http://www.omdbapi.com/?i={imdb_id}&apikey={api_key}"
