@@ -28,13 +28,13 @@ merged_data['overview'] = merged_data['overview'].fillna('')
 
 # Function to fetch movie posters from OMDb API
 def fetch_poster(imdb_id, api_key="61d9a9ee"):
-    if pd.isna(imdb_id) or not imdb_id:
+    if not imdb_id or imdb_id == "N/A":
         return None  # Return None if IMDb ID is invalid
     url = f"http://www.omdbapi.com/?i={imdb_id}&apikey={api_key}"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
-        if data.get("Response") == "True":
+        if data.get("Response") == "True" and data.get("Poster") != "N/A":
             return data.get("Poster")  # Return the poster URL
     return None  # Return None if the API request fails or poster is not found
 
@@ -108,24 +108,19 @@ search_query = st.text_input("What would you like to watch today?")
 if st.button('Get Recommendations'):
     recommended_movies = recommend_movies(user_id, search_query, merged_data)
 
-    # Reset index for recommendations
-    recommended_movies = recommended_movies.reset_index(drop=True)
-    
-    st.write(f"Top Recommended Movies for You:")
-
-    # Display each movie with its poster and details
-    for _, row in recommended_movies.iterrows():
-        col1, col2 = st.columns([1, 3])  # Create two columns for poster and movie details
-        
-        with col1:
-            if row['poster_url']:
-                st.image(row['poster_url'], width=120)  # Display the poster
-            else:
-                continue  # Skip movies without valid posters
-        
-        with col2:
-            st.subheader(row['original_title'])
-            st.write(row['overview'])
+    if recommended_movies.empty:
+        st.write("No recommendations available for your query.")
+    else:
+        for _, row in recommended_movies.iterrows():
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                if row['poster_url']:
+                    st.image(row['poster_url'], width=120)
+                else:
+                    st.write("No poster available")
+            with col2:
+                st.subheader(row['original_title'])
+                st.write(row['overview'])
 
     # Save the trained model components (TfidfVectorizer, etc.) using pickle
     with open('movie_recommendation_model.pkl', 'wb') as model_file:
