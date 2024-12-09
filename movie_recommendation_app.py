@@ -34,12 +34,25 @@ def fetch_poster(imdb_id, api_key="61d9a9ee"):
     if pd.isna(imdb_id) or not imdb_id:
         return None  # Return None if IMDb ID is invalid
     url = f"http://www.omdbapi.com/?i={imdb_id}&apikey={api_key}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        if data.get("Response") == "True":
-            return data.get("Poster")  # Return the poster URL
-    return None  # Return None if the API request fails or poster is not found
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("Response") == "True" and data.get("Poster") and data.get("Poster") != "N/A":
+                return data.get("Poster")
+    except Exception as e:
+        print(f"Error fetching poster for IMDb ID {imdb_id}: {e}")
+    return None
+
+
+poster_cache = {}
+
+def fetch_poster_with_cache(imdb_id, api_key="61d9a9ee"):
+    if imdb_id in poster_cache:
+        return poster_cache[imdb_id]
+    poster_url = fetch_poster(imdb_id, api_key)
+    poster_cache[imdb_id] = poster_url
+    return poster_url
 
 def recommend_movies(user_id, search_query, merged_data):
     # Filter movies rated by the user
@@ -104,7 +117,7 @@ search_query = st.text_input("What would you like to watch today?")
 # Pre-fetch poster URLs for recommendations
 def fetch_posters_for_recommendations(recommended_movies):
     """Fetch posters for all recommended movies."""
-    recommended_movies['poster_url'] = recommended_movies['imdb_id'].apply(fetch_poster)
+    recommended_movies['poster_url'] = recommended_movies['imdb_id'].apply(fetch_poster_with_cache)
     return recommended_movies
 
 # Button to generate recommendations
