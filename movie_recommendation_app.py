@@ -30,7 +30,7 @@ merged_data['overview'] = merged_data['overview'].fillna('')
 def is_english_title(title):
     return bool(re.match('^[A-Za-z0-9\\s:;,.!?()\\-]+$', title))
 # Function to fetch movie posters from OMDb API
-def fetch_poster(imdb_id, api_key="d514e655"):
+def fetch_poster(imdb_id, api_key="61d9a9ee"):
     if pd.isna(imdb_id) or not imdb_id:
         return None  # Return None if IMDb ID is invalid
     url = f"http://www.omdbapi.com/?i={imdb_id}&apikey={api_key}"
@@ -95,32 +95,38 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Apply the custom style to the title
 st.markdown('<h1 class="title">Recommendations For You!</h1>', unsafe_allow_html=True)
 
 # Input fields for user ID and search query
 user_id = st.number_input("Enter User ID", min_value=1, max_value=1000)
 search_query = st.text_input("What would you like to watch today?")
 
+# Pre-fetch poster URLs for recommendations
+def fetch_posters_for_recommendations(recommended_movies):
+    """Fetch posters for all recommended movies."""
+    recommended_movies['poster_url'] = recommended_movies['imdb_id'].apply(fetch_poster)
+    return recommended_movies
+
 # Button to generate recommendations
 if st.button('Get Recommendations'):
+    # Get recommended movies
     recommended_movies = recommend_movies(user_id, search_query, merged_data)
+
+    # Pre-fetch all poster URLs
+    recommended_movies = fetch_posters_for_recommendations(recommended_movies)
 
     # Reset index for recommendations
     recommended_movies = recommended_movies.reset_index(drop=True)
-    
-    st.write(f"Top Recommended Movies for You:")
 
-    # Display each movie with its poster and details
+    st.write("Top Recommended Movies for You:")
+
+    # Display recommendations
     for _, row in recommended_movies.iterrows():
-        col1, col2 = st.columns([1, 3])  # Create two columns for poster and movie details
-        
-        # Fetch the poster for the movie using the IMDb ID
-        poster_url = fetch_poster(row['imdb_id'])
+        col1, col2 = st.columns([1, 3])  # Two columns: poster and details
         
         with col1:
-            if poster_url:
-                st.image(poster_url, width=120)  # Display the poster
+            if row['poster_url'] and row['poster_url'].lower() != "n/a":
+                st.image(row['poster_url'], width=120)  # Display the poster
             else:
                 st.text("No Image Available")
         
@@ -128,6 +134,6 @@ if st.button('Get Recommendations'):
             st.subheader(row['original_title'])
             st.write(row['overview'])
 
-    # Save the trained model components (TfidfVectorizer, etc.) using pickle
+    # Save the model components using pickle
     with open('movie_recommendation_model.pkl', 'wb') as model_file:
         pickle.dump({'tfidf': TfidfVectorizer, 'movies': merged_data}, model_file)
